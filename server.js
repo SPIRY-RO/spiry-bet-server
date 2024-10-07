@@ -33,17 +33,22 @@ io.on('connection', (socket) => {
             socket.on('click', (clickData) => {
                 console.log('Received click from AndroidSender:', clickData);
 
-                // Forward click data to AndroidReceiver if connected
-                if (androidReceiverSocket) {
-                    androidReceiverSocket.emit('click', clickData);
-                    console.log('Forwarded click to AndroidReceiver:', clickData);
-                }
+                // Ensure that the received clickData contains the necessary coordinates
+                if (clickData && clickData.crosshairX && clickData.crosshairY) {
+                    // Forward click data to AndroidReceiver if connected
+                    if (androidReceiverSocket) {
+                        androidReceiverSocket.emit('click', clickData);
+                        console.log('Forwarded click to AndroidReceiver:', clickData);
+                    }
 
-                // Forward click data to all connected DesktopReceivers
-                desktopReceiverSockets.forEach(desktopSocket => {
-                    desktopSocket.emit('click', clickData);
-                    console.log('Forwarded click to DesktopReceiver:', clickData);
-                });
+                    // Forward click data to all connected DesktopReceivers
+                    desktopReceiverSockets.forEach(desktopSocket => {
+                        desktopSocket.emit('click', clickData);
+                        console.log('Forwarded click to DesktopReceiver:', clickData);
+                    });
+                } else {
+                    console.log('Invalid click data received from AndroidSender.');
+                }
             });
         } else if (clientType === 'AndroidReceiver') {
             androidReceiverSocket = socket;
