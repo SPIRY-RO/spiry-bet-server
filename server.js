@@ -1,92 +1,115 @@
+const WebSocket = require('ws');
 const express = require('express');
-const http = require('http');
-const socketIo = require('socket.io');
+const fs = require('fs');
+const cors = require('cors');
+const bodyParser = require('body-parser');
 
 const app = express();
-const server = http.createServer(app);
-const io = socketIo(server);
+const server = new WebSocket.Server({ port: 8080 });
 
-let androidReceiverSocket = null;
-let desktopReceiverSockets = [];
+// Mapping to store active sockets by username
+let activeSockets = {};
 
-const MOTD = `
-**************************************************
-*                                                *
-*              Welcome to Bet Server             *
-*                                                *
-*             Product by Spiry Research          *
-*                                                *
-**************************************************
-`;
+// Load accounts data
+let accounts = [];
+fs.readFile('accounts.json', 'utf8', (err, data) => {
+    if (err) {
+        console.error('Error reading accounts.json:', err);
+    } else {
+        try {
+            accounts = JSON.parse(data);
+            console.log('Accounts loaded successfully:', accounts);
+        } catch (parseError) {
+            console.error('Error parsing accounts.json:', parseError);
+        }
+    }
+});
 
-console.log(MOTD);
+// Express setup
+app.use(cors());
+app.use(bodyParser.json());
 
-io.on('connection', (socket) => {
-    console.log('New client connected');
+// Login endpoint
+app.post('/login', (req, res) => {
+    console.log("Login request received:", req.body);
 
-    // Identify the type of client connecting
-    socket.on('clientType', (clientType) => {
-        if (clientType === 'Android') {
-            console.log('AndroidSender registered');
+    const { username, password } = req.body;
 
-            // Handle click events from AndroidSender
-            socket.on('click', (clickData) => {
-                console.log('Received click from AndroidSender:', clickData);
+    // Validate input
+    if (!username || !password) {
+        return res.status(400).json({ success: false, message: 'Username and password are required' });
+    }
 
-                // Forward click data to AndroidReceiver if connected
-                if (androidReceiverSocket) {
-                    androidReceiverSocket.emit('click', clickData);
-                    console.log('Forwarded click to AndroidReceiver:', clickData);
+    // Find the user in the accounts list
+    const user = accounts.find(account => account.username === username && account.password === password);
+
+    if (user) {
+        res.status(200).json({ success: true, message: 'Login successful' });
+    } else {
+        res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
+});
+
+// Start the Express server
+app.listen(3001, () => {
+    console.log('Express server is running on http://localhost:3000');
+});
+
+// WebSocket setup
+server.on('connection', (socket) => {
+    console.log("Socket is connected.");
+
+    socket.on('message', (message) => {
+        try {
+            const parsedMessage = JSON.parse(message);
+            console.log("Message received:", parsedMessage);
+
+            if (parsedMessage.type === 'register') {
+                const { role, username } = parsedMessage;
+                if (username) {
+                    if (role == "receiver") {
+                        // Register socket with username
+                        activeSockets[username] = socket;
+                        console.log(`${role} socket registered for user: ${username}`);
+                    }
+                } else {
+                    console.log("Username is required for registration.");
+                }
+            } else if (parsedMessage.type === 'signal') {
+                const { username, action } = parsedMessage;
+
+                // Check if the username exists in accounts
+                const userExists = accounts.some(account => account.username === username);
+
+                if (!userExists) {
+                    console.log(`Username ${username} does not exist.`);
+                    return;
                 }
 
-                // Forward click data to all connected DesktopReceivers
-                desktopReceiverSockets.forEach(desktopSocket => {
-                    desktopSocket.emit('click', clickData);
-                    console.log('Forwarded click to DesktopReceiver:', clickData);
-                });
-            });
-        } else if (clientType === 'AndroidReceiver') {
-            androidReceiverSocket = socket;
-            console.log('AndroidReceiver registered');
-
-            // Handle click event from AndroidReceiver (if necessary)
-            socket.on('click', (clickData) => {
-                console.log('Received click from AndroidReceiver:', clickData);
-                // Additional logic for AndroidReceiver clicks (if any) can go here
-            });
-        } else if (clientType === 'DesktopReceiver') {
-            desktopReceiverSockets.push(socket);
-            console.log('DesktopReceiver registered');
-
-            // Handle click event from DesktopReceiver (if necessary)
-            socket.on('click', (clickData) => {
-                console.log('Received click from DesktopReceiver:', clickData);
-                // Additional logic for DesktopReceiver clicks (if any) can go here
-            });
+                // Verify if the username is available in activeSockets
+                if (activeSockets[username]) {
+                    // Send the signal to the corresponding socket
+                    activeSockets[username].send(action);
+                    console.log(`Sending message to ${username}: ${action}`);
+                } else {
+                    console.log(`No active receiver socket found for username: ${username}`);
+                }
+            }
+        } catch (e) {
+            console.log("Error parsing message:", e);
         }
     });
 
-    // Handle disconnections
-    socket.on('disconnect', () => {
-        console.log('Client disconnected');
-
-        // Check if the disconnecting client is AndroidReceiver
-        if (socket === androidReceiverSocket) {
-            console.log('AndroidReceiver disconnected');
-            androidReceiverSocket = null;
-        }
-
-        // Check if the disconnecting client is a DesktopReceiver
-        const index = desktopReceiverSockets.indexOf(socket);
-        if (index !== -1) {
-            console.log('DesktopReceiver disconnected');
-            desktopReceiverSockets.splice(index, 1);
+    socket.on('close', () => {
+        // Remove socket from activeSockets if closed
+        for (let [username, activeSocket] of Object.entries(activeSockets)) {
+            if (activeSocket === socket) {
+                delete activeSockets[username];
+                console.log(`Socket for user ${username} has been closed and removed.`);
+                break;
+            }
         }
     });
 });
 
-// Start the server
-const PORT = 3000;
-server.listen(PORT, () => {
-    console.log(`Server listening on port ${PORT}`);
-});
+console.log('WebSocket server is running on ws://localhost:8080');

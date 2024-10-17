@@ -1,2 +1,3 @@
-# spiry-bet-server
- remote-bet
+##Start the app
+
+`npm start`
