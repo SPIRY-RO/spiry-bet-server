@@ -76,7 +76,12 @@ server.on('connection', (socket) => {
                     console.log("Username is required for registration.");
                 }
             } else if (parsedMessage.type === 'signal') {
-                const { usernames, action } = parsedMessage;
+                let { usernames, username, action } = parsedMessage;
+
+                // Normalize usernames to an array
+                if (!usernames && username) {
+                    usernames = [username];
+                }
 
                 // Validate usernames
                 if (!Array.isArray(usernames)) {
