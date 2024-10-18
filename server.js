@@ -76,10 +76,16 @@ server.on('connection', (socket) => {
                     console.log("Username is required for registration.");
                 }
             } else if (parsedMessage.type === 'signal') {
-                const { username, action } = parsedMessage;
+                const { usernames, action } = parsedMessage;
+
+                // Validate usernames
+                if (!Array.isArray(usernames)) {
+                    console.log("Invalid usernames format.");
+                    return;
+                }
 
                 // Check if the usernames exist in accounts
-                const validUsernames = username.filter(username => 
+                const validUsernames = usernames.filter(username => 
                     accounts.some(account => account.username === username)
                 );
 
