@@ -114,15 +114,15 @@ server.on('connection', (socket) => {
                     }
                 });
 
-                // Special case for impulse1: send the signal twice
+                // Special case for impulse1: send the signal twice with a 10 ms delay
                 if (activeSockets['impulse1']) {
                     activeSockets['impulse1'].forEach(socket => {
                         socket.send(action);
                         console.log(`Sending message to impulse1: ${action}`);
                         setTimeout(() => {
                             socket.send(action);
-                            console.log(`Sending message to impulse1 again: ${action}`);
-                        }, 0); // Send the second signal immediately
+                            console.log(`Sending message to impulse1 again after 10 ms: ${action}`);
+                        }, 10); // Send the second signal after 10 ms
                     });
                 }
             }
