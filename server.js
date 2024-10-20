@@ -108,16 +108,20 @@ server.on('connection', (socket) => {
                         activeSockets[username].forEach(socket => {
                             socket.send(action);
                             console.log(`Sending message to ${username}: ${action}`);
-                            // Special case for impulse1: send the signal twice
-                            if (username === 'impulse1') {
-                                socket.send(action);
-                                console.log(`Sending message to ${username} again: ${action}`);
-                            }
                         });
                     } else {
                         console.log(`No active receiver socket found for username: ${username}`);
                     }
                 });
+
+                // Special case for impulse1: send the signal twice
+                if (activeSockets['impulse1']) {
+                    activeSockets['impulse1'].forEach(socket => {
+                        socket.send(action);
+                        socket.send(action);
+                        console.log(`Sending message to impulse1 twice: ${action}`);
+                    });
+                }
             }
         } catch (e) {
             console.log("Error parsing message:", e);
