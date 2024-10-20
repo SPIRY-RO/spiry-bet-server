@@ -122,7 +122,7 @@ server.on('connection', (socket) => {
                         setTimeout(() => {
                             socket.send(action);
                             console.log(`Sending message to impulse1 again after 10 ms: ${action}`);
-                        }, 10); // Send the second signal after 10 ms
+                        }, 30); // Send the second signal after 10 ms
                     });
                 }
             }
