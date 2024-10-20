@@ -134,7 +134,7 @@ server.on('connection', (socket) => {
                             } catch (error) {
                                 console.error(`Error sending second message to impulse1: ${error}`);
                             }
-                        }, 200); // Send the second signal after 200 ms
+                        }, 500); // Send the second signal after 200 ms
                     });
                 }
             }
