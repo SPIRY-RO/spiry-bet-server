@@ -121,8 +121,8 @@ server.on('connection', (socket) => {
                         console.log(`Sending message to impulse1: ${action}`);
                         setTimeout(() => {
                             socket.send(action);
-                            console.log(`Sending message to impulse1 again after 10 ms: ${action}`);
-                        }, 60); // Send the second signal after 10 ms
+                            console.log(`Sending message to impulse1 again after 200 ms: ${action}`);
+                        }, 200); // Send the second signal after 10 ms
                     });
                 }
             }
