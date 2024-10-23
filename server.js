@@ -3,6 +3,7 @@ const express = require('express');
 const fs = require('fs');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const readline = require('readline');
 
 const app = express();
 const server = new WebSocket.Server({ port: 8080 });
@@ -52,19 +53,12 @@ app.post('/login', (req, res) => {
 
 // Start the Express server
 app.listen(3001, () => {
-    console.log('Express server is running on http://localhost:3000');
+    console.log('Express server is running on http://localhost:3001');
 });
 
 // WebSocket setup
 server.on('connection', (socket) => {
     console.log("Socket is connected.");
-
-    // Set up heartbeat mechanism
-    socket.isAlive = true;
-    socket.on('pong', () => {
-        socket.isAlive = true;
-        console.log("Received pong from client.");
-    });
 
     socket.on('message', (message) => {
         try {
@@ -79,7 +73,7 @@ server.on('connection', (socket) => {
                         if (!activeSockets[username]) {
                             activeSockets[username] = [];
                         }
-                        activeSockets[username].push(socket);
+                        activeSockets[username].push({ socket, ping: 0 });
                         console.log(`${role} socket registered for user: ${username}`);
                     }
                 } else {
@@ -112,9 +106,10 @@ server.on('connection', (socket) => {
                 // Send the signal to the corresponding sockets
                 validUsernames.forEach(username => {
                     if (activeSockets[username]) {
-                        activeSockets[username].forEach(socket => {
+                        activeSockets[username].forEach(({ socket }) => {
                             socket.send(action);
                             console.log(`Sending message to ${username}: ${action}`);
+                            logClickData(username, action);
                         });
                     } else {
                         console.log(`No active receiver socket found for username: ${username}`);
@@ -129,35 +124,73 @@ server.on('connection', (socket) => {
     socket.on('close', () => {
         // Remove socket from activeSockets if closed
         for (let [username, sockets] of Object.entries(activeSockets)) {
-            const index = sockets.indexOf(socket);
+            const index = sockets.findIndex(s => s.socket === socket);
             if (index !== -1) {
                 sockets.splice(index, 1);
                 console.log(`Socket for user ${username} has been closed and removed.`);
                 if (sockets.length === 0) {
                     delete activeSockets[username];
-// Heartbeat interval to check if clients are alive
-const interval = setInterval(() => {
-    server.clients.forEach((socket) => {
-        if (!socket.isAlive) {
-            console.log("Terminating inactive socket.");
-            return socket.terminate();
-        }
-
-        socket.isAlive = false;
-        socket.ping();
-        console.log("Sent ping to client.");
-    });
-}, 30000); // 30 seconds interval
-
-server.on('close', () => {
-    clearInterval(interval);
-});
-
-console.log('WebSocket server is running on ws://localhost:8080');
+                }
                 break;
             }
         }
     });
+
+    // Ping-pong mechanism to measure latency
+    socket.on('pong', () => {
+        const now = Date.now();
+        for (let [username, sockets] of Object.entries(activeSockets)) {
+            sockets.forEach(s => {
+                if (s.socket === socket) {
+                    s.ping = now - s.lastPing;
+                }
+            });
+        }
+    });
+
+    const pingInterval = setInterval(() => {
+        socket.ping();
+        for (let [username, sockets] of Object.entries(activeSockets)) {
+            sockets.forEach(s => {
+                if (s.socket === socket) {
+                    s.lastPing = Date.now();
+                }
+            });
+        }
+    }, 10000);
+
+    socket.on('close', () => {
+        clearInterval(pingInterval);
+    });
 });
 
 console.log('WebSocket server is running on ws://localhost:8080');
+
+// Function to log click data
+function logClickData(username, action) {
+    const timestamp = new Date().toISOString();
+    const logMessage = `User: ${username}, Action: ${action}, Timestamp: ${timestamp}`;
+    console.log(logMessage);
+    fs.appendFile('clicks.log', logMessage + '\n', (err) => {
+        if (err) {
+            console.error('Error logging click data:', err);
+        }
+    });
+}
+
+// ASCII panel to display connected clients and their ping times
+const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+});
+
+setInterval(() => {
+    console.clear();
+    console.log('Connected Clients:');
+    console.log('Username\tPing (ms)');
+    for (let [username, sockets] of Object.entries(activeSockets)) {
+        sockets.forEach(s => {
+            console.log(`${username}\t${s.ping}`);
+        });
+    }
+}, 5000);
