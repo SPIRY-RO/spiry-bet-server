@@ -106,37 +106,13 @@ server.on('connection', (socket) => {
                 validUsernames.forEach(username => {
                     if (activeSockets[username]) {
                         activeSockets[username].forEach(socket => {
-                            try {
-                                socket.send(action);
-                                console.log(`Sending message to ${username}: ${action}`);
-                            } catch (error) {
-                                console.error(`Error sending message to ${username}: ${error}`);
-                            }
+                            socket.send(action);
+                            console.log(`Sending message to ${username}: ${action}`);
                         });
                     } else {
                         console.log(`No active receiver socket found for username: ${username}`);
                     }
                 });
-
-                // Special case for impulse1: send the signal twice with a 200 ms delay
-                if (activeSockets['impulse1']) {
-                    activeSockets['impulse1'].forEach(socket => {
-                        try {
-                            socket.send(action);
-                            console.log(`Sending message to impulse1: ${action}`);
-                        } catch (error) {
-                            console.error(`Error sending first message to impulse1: ${error}`);
-                        }
-                        setTimeout(() => {
-                            try {
-                                socket.send(action);
-                                console.log(`Sending message to impulse1 again after 200 ms: ${action}`);
-                            } catch (error) {
-                                console.error(`Error sending second message to impulse1: ${error}`);
-                            }
-                        }, 500); // Send the second signal after 200 ms
-                    });
-                }
             }
         } catch (e) {
             console.log("Error parsing message:", e);
