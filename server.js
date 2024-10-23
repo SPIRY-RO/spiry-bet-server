@@ -59,6 +59,13 @@ app.listen(3001, () => {
 server.on('connection', (socket) => {
     console.log("Socket is connected.");
 
+    // Set up heartbeat mechanism
+    socket.isAlive = true;
+    socket.on('pong', () => {
+        socket.isAlive = true;
+        console.log("Received pong from client.");
+    });
+
     socket.on('message', (message) => {
         try {
             const parsedMessage = JSON.parse(message);
@@ -128,7 +135,25 @@ server.on('connection', (socket) => {
                 console.log(`Socket for user ${username} has been closed and removed.`);
                 if (sockets.length === 0) {
                     delete activeSockets[username];
-                }
+// Heartbeat interval to check if clients are alive
+const interval = setInterval(() => {
+    server.clients.forEach((socket) => {
+        if (!socket.isAlive) {
+            console.log("Terminating inactive socket.");
+            return socket.terminate();
+        }
+
+        socket.isAlive = false;
+        socket.ping();
+        console.log("Sent ping to client.");
+    });
+}, 30000); // 30 seconds interval
+
+server.on('close', () => {
+    clearInterval(interval);
+});
+
+console.log('WebSocket server is running on ws://localhost:8080');
                 break;
             }
         }
