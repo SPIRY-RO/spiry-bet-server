@@ -76,24 +76,27 @@ server.on('connection', (socket) => {
                     console.log("Username is required for registration.");
                 }
             } else if (parsedMessage.type === 'signal') {
-                const { username, action } = parsedMessage;
+                const { usernames, action } = parsedMessage;
 
-                // Check if the username exists in accounts
-                const userExists = accounts.some(account => account.username === username);
+                // Check if the usernames exist in accounts
+                const validUsernames = usernames.filter(username => 
+                    accounts.some(account => account.username === username)
+                );
 
-                if (!userExists) {
-                    console.log(`Username ${username} does not exist.`);
+                if (validUsernames.length === 0) {
+                    console.log(`None of the usernames exist.`);
                     return;
                 }
 
-                // Verify if the username is available in activeSockets
-                if (activeSockets[username]) {
-                    // Send the signal to the corresponding socket
-                    activeSockets[username].send(action);
-                    console.log(`Sending message to ${username}: ${action}`);
-                } else {
-                    console.log(`No active receiver socket found for username: ${username}`);
-                }
+                // Send the signal to the corresponding sockets
+                validUsernames.forEach(username => {
+                    if (activeSockets[username]) {
+                        activeSockets[username].send(action);
+                        console.log(`Sending message to ${username}: ${action}`);
+                    } else {
+                        console.log(`No active receiver socket found for username: ${username}`);
+                    }
+                });
             }
         } catch (e) {
             console.log("Error parsing message:", e);
