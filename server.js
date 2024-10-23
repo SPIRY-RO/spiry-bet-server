@@ -9,6 +9,7 @@ const server = new WebSocket.Server({ port: 8080 });
 
 // Mapping to store active sockets by username
 let activeSockets = {};
+let disconnectStats = {};
 
 // Load accounts data
 let accounts = [];
@@ -50,76 +51,26 @@ app.post('/login', (req, res) => {
     }
 });
 
-// Start the Express server
-app.listen(3001, () => {
-    console.log('Express server is running on http://localhost:3000');
-});
+// Heartbeat function to keep connections alive
+function heartbeat() {
+    this.isAlive = true;
+}
 
-// WebSocket setup
 server.on('connection', (socket) => {
-    console.log("Socket is connected.");
+    socket.isAlive = true;
+    socket.on('pong', heartbeat);
 
     socket.on('message', (message) => {
         try {
-            const parsedMessage = JSON.parse(message);
-            console.log("Message received:", parsedMessage);
-
-            if (parsedMessage.type === 'register') {
-                const { role, username } = parsedMessage;
-                if (username) {
-                    if (role == "receiver") {
-                        // Register socket with username
-                        if (!activeSockets[username]) {
-                            activeSockets[username] = [];
-                        }
-                        activeSockets[username].push(socket);
-                        console.log(`${role} socket registered for user: ${username}`);
-                    }
-                } else {
-                    console.log("Username is required for registration.");
-                }
-            } else if (parsedMessage.type === 'signal') {
-                let { usernames, username, action } = parsedMessage;
-
-                // Normalize usernames to an array
-                if (!usernames && username) {
-                    usernames = [username];
-                }
-
-                // Validate usernames
-                if (!Array.isArray(usernames)) {
-                    console.log("Invalid usernames format.");
-                    return;
-                }
-
-                // Check if the usernames exist in accounts
-                const validUsernames = usernames.filter(username => 
-                    accounts.some(account => account.username === username)
-                );
-
-                if (validUsernames.length === 0) {
-                    console.log(`None of the usernames exist.`);
-                    return;
-                }
-
-                // Send the signal to the corresponding sockets
-                validUsernames.forEach(username => {
-                    if (activeSockets[username]) {
-                        activeSockets[username].forEach(socket => {
-                            socket.send(action);
-                            console.log(`Sending message to ${username}: ${action}`);
-                        });
-                    } else {
-                        console.log(`No active receiver socket found for username: ${username}`);
-                    }
-                });
-            }
+            const data = JSON.parse(message);
+            console.log('Received message:', data);
+            // Handle incoming messages
         } catch (e) {
             console.log("Error parsing message:", e);
         }
     });
 
-    socket.on('close', () => {
+    socket.on('close', (code, reason) => {
         // Remove socket from activeSockets if closed
         for (let [username, sockets] of Object.entries(activeSockets)) {
             const index = sockets.indexOf(socket);
@@ -132,7 +83,35 @@ server.on('connection', (socket) => {
                 break;
             }
         }
+
+        // Log disconnect reason
+        const reasonText = reason.toString() || 'Unknown reason';
+        disconnectStats[reasonText] = (disconnectStats[reasonText] || 0) + 1;
+        console.log(`Socket closed with code ${code} and reason: ${reasonText}`);
     });
+});
+
+// Ping clients every 30 seconds to check if they are still alive
+const interval = setInterval(() => {
+    server.clients.forEach((socket) => {
+        if (socket.isAlive === false) {
+            socket.terminate();
+            return;
+        }
+
+        socket.isAlive = false;
+        socket.ping();
+    });
+}, 30000);
+
+server.on('close', () => {
+    clearInterval(interval);
+    // Optionally, write disconnect stats to a file
+    fs.writeFileSync('disconnectStats.json', JSON.stringify(disconnectStats, null, 2));
+});
+
+app.listen(3001, () => {
+    console.log('Express server is running on http://localhost:3000');
 });
 
 console.log('WebSocket server is running on ws://localhost:8080');
