@@ -9,7 +9,6 @@ const server = new WebSocket.Server({ port: 8080 });
 
 // Mapping to store active sockets by username
 let activeSockets = {};
-let disconnectStats = {};
 
 // Load accounts data
 let accounts = [];
@@ -51,67 +50,66 @@ app.post('/login', (req, res) => {
     }
 });
 
-// Heartbeat function to keep connections alive
-function heartbeat() {
-    this.isAlive = true;
-}
+// Start the Express server
+app.listen(3001, () => {
+    console.log('Express server is running on http://localhost:3000');
+});
 
+// WebSocket setup
 server.on('connection', (socket) => {
-    socket.isAlive = true;
-    socket.on('pong', heartbeat);
+    console.log("Socket is connected.");
 
     socket.on('message', (message) => {
         try {
-            const data = JSON.parse(message);
-            console.log('Received message:', data);
-            // Handle incoming messages
+            const parsedMessage = JSON.parse(message);
+            console.log("Message received:", parsedMessage);
+
+            if (parsedMessage.type === 'register') {
+                const { role, username } = parsedMessage;
+                if (username) {
+                    if (role == "receiver") {
+                        // Register socket with username
+                        activeSockets[username] = socket;
+                        console.log(`${role} socket registered for user: ${username}`);
+                    }
+                } else {
+                    console.log("Username is required for registration.");
+                }
+            } else if (parsedMessage.type === 'signal') {
+                const { username, action } = parsedMessage;
+
+                // Check if the username exists in accounts
+                const userExists = accounts.some(account => account.username === username);
+
+                if (!userExists) {
+                    console.log(`Username ${username} does not exist.`);
+                    return;
+                }
+
+                // Verify if the username is available in activeSockets
+                if (activeSockets[username]) {
+                    // Send the signal to the corresponding socket
+                    activeSockets[username].send(action);
+                    console.log(`Sending message to ${username}: ${action}`);
+                } else {
+                    console.log(`No active receiver socket found for username: ${username}`);
+                }
+            }
         } catch (e) {
             console.log("Error parsing message:", e);
         }
     });
 
-    socket.on('close', (code, reason) => {
+    socket.on('close', () => {
         // Remove socket from activeSockets if closed
-        for (let [username, sockets] of Object.entries(activeSockets)) {
-            const index = sockets.indexOf(socket);
-            if (index !== -1) {
-                sockets.splice(index, 1);
+        for (let [username, activeSocket] of Object.entries(activeSockets)) {
+            if (activeSocket === socket) {
+                delete activeSockets[username];
                 console.log(`Socket for user ${username} has been closed and removed.`);
-                if (sockets.length === 0) {
-                    delete activeSockets[username];
-                }
                 break;
             }
         }
-
-        // Log disconnect reason
-        const reasonText = reason.toString() || 'Unknown reason';
-        disconnectStats[reasonText] = (disconnectStats[reasonText] || 0) + 1;
-        console.log(`Socket closed with code ${code} and reason: ${reasonText}`);
     });
-});
-
-// Ping clients every 30 seconds to check if they are still alive
-const interval = setInterval(() => {
-    server.clients.forEach((socket) => {
-        if (socket.isAlive === false) {
-            socket.terminate();
-            return;
-        }
-
-        socket.isAlive = false;
-        socket.ping();
-    });
-}, 30000);
-
-server.on('close', () => {
-    clearInterval(interval);
-    // Optionally, write disconnect stats to a file
-    fs.writeFileSync('disconnectStats.json', JSON.stringify(disconnectStats, null, 2));
-});
-
-app.listen(3001, () => {
-    console.log('Express server is running on http://localhost:3000');
 });
 
 console.log('WebSocket server is running on ws://localhost:8080');
