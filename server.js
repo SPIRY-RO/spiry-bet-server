@@ -69,14 +69,28 @@ server.on('connection', (socket) => {
                 if (username) {
                     if (role == "receiver") {
                         // Register socket with username
-                        activeSockets[username] = socket;
+                        if (!activeSockets[username]) {
+                            activeSockets[username] = [];
+                        }
+                        activeSockets[username].push(socket);
                         console.log(`${role} socket registered for user: ${username}`);
                     }
                 } else {
                     console.log("Username is required for registration.");
                 }
             } else if (parsedMessage.type === 'signal') {
-                const { usernames, action } = parsedMessage;
+                let { usernames, username, action } = parsedMessage;
+
+                // Normalize usernames to an array
+                if (!usernames && username) {
+                    usernames = [username];
+                }
+
+                // Validate usernames
+                if (!Array.isArray(usernames)) {
+                    console.log("Invalid usernames format.");
+                    return;
+                }
 
                 // Check if the usernames exist in accounts
                 const validUsernames = usernames.filter(username => 
@@ -91,8 +105,10 @@ server.on('connection', (socket) => {
                 // Send the signal to the corresponding sockets
                 validUsernames.forEach(username => {
                     if (activeSockets[username]) {
-                        activeSockets[username].send(action);
-                        console.log(`Sending message to ${username}: ${action}`);
+                        activeSockets[username].forEach(socket => {
+                            socket.send(action);
+                            console.log(`Sending message to ${username}: ${action}`);
+                        });
                     } else {
                         console.log(`No active receiver socket found for username: ${username}`);
                     }
@@ -105,10 +121,14 @@ server.on('connection', (socket) => {
 
     socket.on('close', () => {
         // Remove socket from activeSockets if closed
-        for (let [username, activeSocket] of Object.entries(activeSockets)) {
-            if (activeSocket === socket) {
-                delete activeSockets[username];
+        for (let [username, sockets] of Object.entries(activeSockets)) {
+            const index = sockets.indexOf(socket);
+            if (index !== -1) {
+                sockets.splice(index, 1);
                 console.log(`Socket for user ${username} has been closed and removed.`);
+                if (sockets.length === 0) {
+                    delete activeSockets[username];
+                }
                 break;
             }
         }
