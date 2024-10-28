@@ -52,13 +52,14 @@ fastify.post('/login', (request, reply) => {
 });
 
 // Start the Fastify server
-fastify.listen(3001, (err, address) => {
-    if (err) {
-        fastify.log.error(err);
-        process.exit(1);
-    }
+fastify.listen({ port: 3001 })
+  .then((address) => {
     fastify.log.info(`Server listening on ${address}`);
-});
+  })
+  .catch((err) => {
+    fastify.log.error(err);
+    process.exit(1);
+  });
 
 // WebSocket setup using uWebSockets.js
 uWS.App().ws('/*', {
