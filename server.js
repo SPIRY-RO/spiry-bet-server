@@ -3,6 +3,7 @@ const fastify = require('fastify')({ logger: true });
 const fs = require('fs');
 const cors = require('cors');
 const readline = require('readline');
+const fastifyCors = require('@fastify/cors');
 
 const port = 8080;
 
@@ -25,8 +26,9 @@ fs.readFile('accounts.json', 'utf8', (err, data) => {
 });
 
 // Fastify setup
-fastify.register(require('fastify-cors'), { 
-    // put your options here
+fastify.register(fastifyCors, {
+  origin: '*', // Adjust the origin as needed
+  methods: ['GET', 'POST'] // Adjust the methods as needed
 });
 fastify.register(require('fastify-formbody'));
 
