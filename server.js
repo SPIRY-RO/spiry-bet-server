@@ -1,11 +1,9 @@
 const uWS = require('uWebSockets.js');
-const express = require('express');
+const fastify = require('fastify')({ logger: true });
 const fs = require('fs');
 const cors = require('cors');
-const bodyParser = require('body-parser');
 const readline = require('readline');
 
-const app = express();
 const port = 8080;
 
 // Mapping to store active sockets by username
@@ -26,34 +24,40 @@ fs.readFile('accounts.json', 'utf8', (err, data) => {
     }
 });
 
-// Express setup
-app.use(cors());
-app.use(bodyParser.json());
+// Fastify setup
+fastify.register(require('fastify-cors'), { 
+    // put your options here
+});
+fastify.register(require('fastify-formbody'));
 
 // Login endpoint
-app.post('/login', (req, res) => {
-    console.log("Login request received:", req.body);
+fastify.post('/login', (request, reply) => {
+    console.log("Login request received:", request.body);
 
-    const { username, password } = req.body;
+    const { username, password } = request.body;
 
     // Validate input
     if (!username || !password) {
-        return res.status(400).json({ success: false, message: 'Username and password are required' });
+        return reply.status(400).send({ success: false, message: 'Username and password are required' });
     }
 
     // Find the user in the accounts list
     const user = accounts.find(account => account.username === username && account.password === password);
 
     if (user) {
-        res.status(200).json({ success: true, message: 'Login successful' });
+        reply.status(200).send({ success: true, message: 'Login successful' });
     } else {
-        res.status(401).json({ success: false, message: 'Invalid credentials' });
+        reply.status(401).send({ success: false, message: 'Invalid credentials' });
     }
 });
 
-// Start the Express server
-app.listen(3001, () => {
-    console.log('Express server is running on http://localhost:3001');
+// Start the Fastify server
+fastify.listen(3001, (err, address) => {
+    if (err) {
+        fastify.log.error(err);
+        process.exit(1);
+    }
+    fastify.log.info(`Fastify server is running on ${address}`);
 });
 
 // WebSocket setup using uWebSockets.js
