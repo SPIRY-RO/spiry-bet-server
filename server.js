@@ -1,4 +1,4 @@
-const WebSocket = require('ws');
+const uWS = require('uWebSockets.js');
 const express = require('express');
 const fs = require('fs');
 const cors = require('cors');
@@ -6,7 +6,7 @@ const bodyParser = require('body-parser');
 const readline = require('readline');
 
 const app = express();
-const server = new WebSocket.Server({ port: 8080 });
+const port = 8080;
 
 // Mapping to store active sockets by username
 let activeSockets = {};
@@ -56,13 +56,27 @@ app.listen(3001, () => {
     console.log('Express server is running on http://localhost:3001');
 });
 
-// WebSocket setup
-server.on('connection', (socket) => {
-    console.log("Socket is connected.");
-
-    socket.on('message', (message) => {
+// WebSocket setup using uWebSockets.js
+uWS.App().ws('/*', {
+    open: (ws) => {
+        console.log("Socket is connected.");
+        ws.pingInterval = setInterval(() => {
+            ws.ping();
+            for (let [username, sockets] of Object.entries(activeSockets)) {
+                sockets.forEach(s => {
+                    if (s.socket === ws) {
+                        if (Date.now() - s.lastPing > 10000) {
+                            s.missedPongs++;
+                        }
+                        s.lastPing = Date.now();
+                    }
+                });
+            }
+        }, 10000);
+    },
+    message: (ws, message, isBinary) => {
         try {
-            const parsedMessage = JSON.parse(message);
+            const parsedMessage = JSON.parse(Buffer.from(message).toString());
             console.log("Message received:", parsedMessage);
 
             if (parsedMessage.type === 'register') {
@@ -73,7 +87,7 @@ server.on('connection', (socket) => {
                         if (!activeSockets[username]) {
                             activeSockets[username] = [];
                         }
-                        activeSockets[username].push({ socket, ping: 0, missedPongs: 0 });
+                        activeSockets[username].push({ socket: ws, ping: 0, missedPongs: 0 });
                         console.log(`${role} socket registered for user: ${username}`);
                     }
                 } else {
@@ -119,12 +133,11 @@ server.on('connection', (socket) => {
         } catch (e) {
             console.log("Error parsing message:", e);
         }
-    });
-
-    socket.on('close', () => {
+    },
+    close: (ws) => {
         // Remove socket from activeSockets if closed
         for (let [username, sockets] of Object.entries(activeSockets)) {
-            const index = sockets.findIndex(s => s.socket === socket);
+            const index = sockets.findIndex(s => s.socket === ws);
             if (index !== -1) {
                 sockets.splice(index, 1);
                 console.log(`Socket for user ${username} has been closed and removed.`);
@@ -134,38 +147,26 @@ server.on('connection', (socket) => {
                 break;
             }
         }
-        clearInterval(socket.pingInterval);
-    });
-
-    // Ping-pong mechanism to measure latency and packet loss
-    socket.on('pong', () => {
+        clearInterval(ws.pingInterval);
+    },
+    pong: (ws) => {
         const now = Date.now();
         for (let [username, sockets] of Object.entries(activeSockets)) {
             sockets.forEach(s => {
-                if (s.socket === socket) {
+                if (s.socket === ws) {
                     s.ping = now - s.lastPing;
                     s.missedPongs = 0; // Reset missed pongs on successful pong
                 }
             });
         }
-    });
-
-    socket.pingInterval = setInterval(() => {
-        socket.ping();
-        for (let [username, sockets] of Object.entries(activeSockets)) {
-            sockets.forEach(s => {
-                if (s.socket === socket) {
-                    if (Date.now() - s.lastPing > 10000) {
-                        s.missedPongs++;
-                    }
-                    s.lastPing = Date.now();
-                }
-            });
-        }
-    }, 10000);
+    }
+}).listen(port, (token) => {
+    if (token) {
+        console.log(`WebSocket server is running on ws://localhost:${port}`);
+    } else {
+        console.log(`Failed to listen to port ${port}`);
+    }
 });
-
-console.log('WebSocket server is running on ws://localhost:8080');
 
 // Function to log click data
 function logClickData(username, action) {
