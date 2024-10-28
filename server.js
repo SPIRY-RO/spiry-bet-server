@@ -64,7 +64,9 @@ fastify.listen({ port: 3001 })
   });
 
 // WebSocket setup using uWebSockets.js
-uWS.App().ws('/*', {
+const app = uWS.App();
+
+app.ws('/*', {
     open: (ws, req) => {
         const ipArrayBuffer = ws.getRemoteAddressAsText();
         const ip = Buffer.from(ipArrayBuffer).toString();
@@ -130,7 +132,7 @@ uWS.App().ws('/*', {
 
                 // Send the signal to the corresponding sockets using publish
                 validUsernames.forEach(username => {
-                    uWS.publish(username, action);
+                    app.publish(username, action, false, false);
                     console.log(`Publishing message to ${username}: ${action}`);
                     logClickData(username, action);
                 });
