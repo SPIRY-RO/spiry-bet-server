@@ -57,7 +57,7 @@ fastify.listen(3001, (err, address) => {
         fastify.log.error(err);
         process.exit(1);
     }
-    fastify.log.info(`Fastify server is running on ${address}`);
+    fastify.log.info(`Server listening on ${address}`);
 });
 
 // WebSocket setup using uWebSockets.js
