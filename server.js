@@ -6,6 +6,7 @@ const fastifyCors = require('@fastify/cors');
 const fastifyFormbody = require('@fastify/formbody');
 
 const port = 8080;
+const RECEIVER_TOPIC = 'receivers'; // Single topic for all receivers
 
 // Mapping to store active sockets by username
 let activeSockets = {};
@@ -72,6 +73,7 @@ app.ws('/*', {
         const ip = Buffer.from(ipArrayBuffer).toString();
         console.log("Socket is connected from IP:", ip);
         ws.ip = ip;
+        ws.subscribe(RECEIVER_TOPIC); // Subscribe all receivers to the single topic
         ws.pingInterval = setInterval(() => {
             ws.ping();
             for (let [username, sockets] of Object.entries(activeSockets)) {
@@ -100,42 +102,18 @@ app.ws('/*', {
                             activeSockets[username] = [];
                         }
                         activeSockets[username].push({ socket: ws, ip: ws.ip, ping: 0, missedPongs: 0 });
-                        ws.subscribe(username); // Subscribe to the topic based on username
                         console.log(`${role} socket registered for user: ${username}`);
                     }
                 } else {
                     console.log("Username is required for registration.");
                 }
             } else if (parsedMessage.type === 'signal') {
-                let { usernames, username, action } = parsedMessage;
+                const { action } = parsedMessage;
 
-                // Normalize usernames to an array
-                if (!usernames && username) {
-                    usernames = [username];
-                }
-
-                // Validate usernames
-                if (!Array.isArray(usernames)) {
-                    console.log("Invalid usernames format.");
-                    return;
-                }
-
-                // Check if the usernames exist in accounts
-                const validUsernames = usernames.filter(username => 
-                    accounts.some(account => account.username === username)
-                );
-
-                if (validUsernames.length === 0) {
-                    console.log(`None of the usernames exist.`);
-                    return;
-                }
-
-                // Send the signal to the corresponding sockets using publish
-                validUsernames.forEach(username => {
-                    app.publish(username, action, false, false);
-                    console.log(`Publishing message to ${username}: ${action}`);
-                    logClickData(username, action);
-                });
+                // Publish the signal to all receivers
+                app.publish(RECEIVER_TOPIC, action, false, false);
+                console.log(`Publishing message to all receivers: ${action}`);
+                logClickData('all_receivers', action);
             }
         } catch (e) {
             console.log("Error parsing message:", e);
