@@ -4,8 +4,6 @@ const fs = require('fs');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const readline = require('readline');
-const msgpack = require('msgpack-lite');
-const zlib = require('zlib');
 
 const app = express();
 const server = new WebSocket.Server({ port: 8080 });
@@ -64,26 +62,20 @@ server.on('connection', (socket) => {
 
     socket.on('message', (message) => {
         try {
-            // Log the raw message for debugging
-            console.log("Raw message received:", message);
-
-            // Ensure the message is a valid buffer before decompressing
-            if (!Buffer.isBuffer(message)) {
-                throw new Error("Message is not a buffer");
-            }
-
-            const parsedMessage = msgpack.decode(zlib.inflateSync(message));
+            const parsedMessage = JSON.parse(message);
             console.log("Message received:", parsedMessage);
 
             if (parsedMessage.type === 'register') {
                 const { role, username } = parsedMessage;
                 if (username) {
-                    // Register socket with username for both receiver and sender roles
-                    if (!activeSockets[username]) {
-                        activeSockets[username] = [];
+                    if (role == "receiver") {
+                        // Register socket with username
+                        if (!activeSockets[username]) {
+                            activeSockets[username] = [];
+                        }
+                        activeSockets[username].push({ socket, ping: 0, missedPongs: 0 });
+                        console.log(`${role} socket registered for user: ${username}`);
                     }
-                    activeSockets[username].push({ socket, ping: 0, missedPongs: 0 });
-                    console.log(`${role} socket registered for user: ${username}`);
                 } else {
                     console.log("Username is required for registration.");
                 }
@@ -115,8 +107,7 @@ server.on('connection', (socket) => {
                 validUsernames.forEach(username => {
                     if (activeSockets[username]) {
                         activeSockets[username].forEach(({ socket }) => {
-                            const compressedAction = zlib.deflateSync(Buffer.from(action));
-                            socket.send(compressedAction);
+                            socket.send(action);
                             console.log(`Sending message to ${username}: ${action}`);
                             logClickData(username, action);
                         });
@@ -164,14 +155,14 @@ server.on('connection', (socket) => {
         for (let [username, sockets] of Object.entries(activeSockets)) {
             sockets.forEach(s => {
                 if (s.socket === socket) {
-                    if (Date.now() - s.lastPing > 5000) { // Reduced interval
+                    if (Date.now() - s.lastPing > 10000) {
                         s.missedPongs++;
                     }
                     s.lastPing = Date.now();
                 }
             });
         }
-    }, 5000); // Reduced interval
+    }, 10000);
 });
 
 console.log('WebSocket server is running on ws://localhost:8080');
