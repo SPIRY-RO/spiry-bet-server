@@ -1,7 +1,6 @@
 const uWS = require('uWebSockets.js');
 const fastify = require('fastify')({ logger: true });
 const fs = require('fs');
-const cors = require('cors');
 const readline = require('readline');
 const fastifyCors = require('@fastify/cors');
 const fastifyFormbody = require('@fastify/formbody');
@@ -66,8 +65,10 @@ fastify.listen({ port: 3001 })
 
 // WebSocket setup using uWebSockets.js
 uWS.App().ws('/*', {
-    open: (ws) => {
-        console.log("Socket is connected.");
+    open: (ws, req) => {
+        const ip = req.getHeader('x-forwarded-for') || req.getRemoteAddressAsText();
+        console.log("Socket is connected from IP:", ip);
+        ws.ip = ip;
         ws.pingInterval = setInterval(() => {
             ws.ping();
             for (let [username, sockets] of Object.entries(activeSockets)) {
@@ -95,7 +96,7 @@ uWS.App().ws('/*', {
                         if (!activeSockets[username]) {
                             activeSockets[username] = [];
                         }
-                        activeSockets[username].push({ socket: ws, ping: 0, missedPongs: 0 });
+                        activeSockets[username].push({ socket: ws, ip: ws.ip, ping: 0, missedPongs: 0 });
                         console.log(`${role} socket registered for user: ${username}`);
                     }
                 } else {
@@ -197,10 +198,10 @@ const rl = readline.createInterface({
 setInterval(() => {
     console.clear();
     console.log('Connected Clients:');
-    console.log('Username\tPing (ms)\tMissed Pongs');
+    console.log('Username\tIP Address\tPing (ms)\tMissed Pongs');
     for (let [username, sockets] of Object.entries(activeSockets)) {
         sockets.forEach(s => {
-            console.log(`${username}\t${s.ping}\t${s.missedPongs}`);
+            console.log(`${username}\t${s.ip}\t${s.ping}\t${s.missedPongs}`);
         });
     }
 }, 5000);
