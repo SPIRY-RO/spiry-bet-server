@@ -64,7 +64,15 @@ server.on('connection', (socket) => {
 
     socket.on('message', (message) => {
         try {
-            const parsedMessage = msgpack.decode(zlib.inflateSync(Buffer.from(message)));
+            // Log the raw message for debugging
+            console.log("Raw message received:", message);
+
+            // Ensure the message is a valid buffer before decompressing
+            if (!Buffer.isBuffer(message)) {
+                throw new Error("Message is not a buffer");
+            }
+
+            const parsedMessage = msgpack.decode(zlib.inflateSync(message));
             console.log("Message received:", parsedMessage);
 
             if (parsedMessage.type === 'register') {
