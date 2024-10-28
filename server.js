@@ -66,7 +66,7 @@ fastify.listen({ port: 3001 })
 // WebSocket setup using uWebSockets.js
 uWS.App().ws('/*', {
     open: (ws, req) => {
-        const ip = req.getHeader('x-forwarded-for') || req.getRemoteAddressAsText();
+        const ip = req.getRemoteAddressAsText();
         console.log("Socket is connected from IP:", ip);
         ws.ip = ip;
         ws.pingInterval = setInterval(() => {
