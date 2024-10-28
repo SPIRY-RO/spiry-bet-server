@@ -54,7 +54,7 @@ fastify.post('/login', (request, reply) => {
 });
 
 // Start the Fastify server
-fastify.listen({ port: 3001 })
+fastify.listen({ port: 3001, host: '188.245.77.22' })
   .then((address) => {
     fastify.log.info(`Server listening on ${address}`);
   })
