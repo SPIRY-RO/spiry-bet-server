@@ -4,6 +4,7 @@ const fs = require('fs');
 const cors = require('cors');
 const readline = require('readline');
 const fastifyCors = require('@fastify/cors');
+const fastifyFormbody = require('@fastify/formbody');
 
 const port = 8080;
 
@@ -30,7 +31,7 @@ fastify.register(fastifyCors, {
   origin: '*', // Adjust the origin as needed
   methods: ['GET', 'POST'] // Adjust the methods as needed
 });
-fastify.register(require('fastify-formbody'));
+fastify.register(fastifyFormbody);
 
 // Login endpoint
 fastify.post('/login', (request, reply) => {
