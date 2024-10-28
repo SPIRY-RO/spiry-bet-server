@@ -73,7 +73,7 @@ server.on('connection', (socket) => {
                         if (!activeSockets[username]) {
                             activeSockets[username] = [];
                         }
-                        activeSockets[username].push({ socket, ping: 0 });
+                        activeSockets[username].push({ socket, ping: 0, missedPongs: 0 });
                         console.log(`${role} socket registered for user: ${username}`);
                     }
                 } else {
@@ -134,34 +134,35 @@ server.on('connection', (socket) => {
                 break;
             }
         }
+        clearInterval(socket.pingInterval);
     });
 
-    // Ping-pong mechanism to measure latency
+    // Ping-pong mechanism to measure latency and packet loss
     socket.on('pong', () => {
         const now = Date.now();
         for (let [username, sockets] of Object.entries(activeSockets)) {
             sockets.forEach(s => {
                 if (s.socket === socket) {
                     s.ping = now - s.lastPing;
+                    s.missedPongs = 0; // Reset missed pongs on successful pong
                 }
             });
         }
     });
 
-    const pingInterval = setInterval(() => {
+    socket.pingInterval = setInterval(() => {
         socket.ping();
         for (let [username, sockets] of Object.entries(activeSockets)) {
             sockets.forEach(s => {
                 if (s.socket === socket) {
+                    if (Date.now() - s.lastPing > 10000) {
+                        s.missedPongs++;
+                    }
                     s.lastPing = Date.now();
                 }
             });
         }
     }, 10000);
-
-    socket.on('close', () => {
-        clearInterval(pingInterval);
-    });
 });
 
 console.log('WebSocket server is running on ws://localhost:8080');
@@ -187,10 +188,10 @@ const rl = readline.createInterface({
 setInterval(() => {
     console.clear();
     console.log('Connected Clients:');
-    console.log('Username\tPing (ms)');
+    console.log('Username\tPing (ms)\tMissed Pongs');
     for (let [username, sockets] of Object.entries(activeSockets)) {
         sockets.forEach(s => {
-            console.log(`${username}\t${s.ping}`);
+            console.log(`${username}\t${s.ping}\t${s.missedPongs}`);
         });
     }
 }, 5000);
