@@ -98,6 +98,7 @@ uWS.App().ws('/*', {
                             activeSockets[username] = [];
                         }
                         activeSockets[username].push({ socket: ws, ip: ws.ip, ping: 0, missedPongs: 0 });
+                        ws.subscribe(username); // Subscribe to the topic based on username
                         console.log(`${role} socket registered for user: ${username}`);
                     }
                 } else {
@@ -127,17 +128,11 @@ uWS.App().ws('/*', {
                     return;
                 }
 
-                // Send the signal to the corresponding sockets
+                // Send the signal to the corresponding sockets using publish
                 validUsernames.forEach(username => {
-                    if (activeSockets[username]) {
-                        activeSockets[username].forEach(({ socket }) => {
-                            socket.send(action);
-                            console.log(`Sending message to ${username}: ${action}`);
-                            logClickData(username, action);
-                        });
-                    } else {
-                        console.log(`No active receiver socket found for username: ${username}`);
-                    }
+                    uWS.publish(username, action);
+                    console.log(`Publishing message to ${username}: ${action}`);
+                    logClickData(username, action);
                 });
             }
         } catch (e) {
