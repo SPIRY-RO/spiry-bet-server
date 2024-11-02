@@ -1,6 +1,6 @@
 const uWS = require('uWebSockets.js');
 const fastify = require('fastify')({ logger: true });
-const fs = require('fs');
+const fs = require('fs').promises; // Use promises for async file operations
 const readline = require('readline');
 const fastifyCors = require('@fastify/cors');
 const fastifyFormbody = require('@fastify/formbody');
@@ -11,20 +11,18 @@ const RECEIVER_TOPIC = 'receivers'; // Single topic for all receivers
 // Mapping to store active sockets by username
 let activeSockets = {};
 
-// Load accounts data
+// Load accounts data asynchronously
 let accounts = [];
-fs.readFile('accounts.json', 'utf8', (err, data) => {
-    if (err) {
-        console.error('Error reading accounts.json:', err);
-    } else {
-        try {
-            accounts = JSON.parse(data);
-            console.log('Accounts loaded successfully:', accounts);
-        } catch (parseError) {
-            console.error('Error parsing accounts.json:', parseError);
-        }
+async function loadAccounts() {
+    try {
+        const data = await fs.readFile('accounts.json', 'utf8');
+        accounts = JSON.parse(data);
+        console.log('Accounts loaded successfully:', accounts);
+    } catch (err) {
+        console.error('Error reading or parsing accounts.json:', err);
     }
-});
+}
+loadAccounts();
 
 // Fastify setup
 fastify.register(fastifyCors, {
@@ -55,7 +53,7 @@ fastify.post('/login', (request, reply) => {
 });
 
 // Start the Fastify server
-fastify.listen({ port: 3001, host: '127.0.0.1' })
+fastify.listen({ port: 3001, host: '0.0.0.0' }) // Bind to all network interfaces
   .then((address) => {
     fastify.log.info(`Server listening on ${address}`);
   })
@@ -71,8 +69,9 @@ app.ws('/*', {
     open: (ws, req) => {
         const ipArrayBuffer = ws.getRemoteAddressAsText();
         const ip = Buffer.from(ipArrayBuffer).toString();
-        console.log("Socket is connected from IP:", ip);
-        ws.ip = ip;
+        const readableIp = ip.replace(/[^0-9.]/g, ''); // Convert to readable IPv4 format
+        console.log("Socket is connected from IP:", readableIp);
+        ws.ip = readableIp;
         ws.subscribe(RECEIVER_TOPIC); // Subscribe all receivers to the single topic
         ws.pingInterval = setInterval(() => {
             ws.ping();
@@ -154,15 +153,15 @@ app.ws('/*', {
 });
 
 // Function to log click data
-function logClickData(username, action) {
+async function logClickData(username, action) {
     const timestamp = new Date().toISOString();
     const logMessage = `User: ${username}, Action: ${action}, Timestamp: ${timestamp}`;
     console.log(logMessage);
-    fs.appendFile('clicks.log', logMessage + '\n', (err) => {
-        if (err) {
-            console.error('Error logging click data:', err);
-        }
-    });
+    try {
+        await fs.appendFile('clicks.log', logMessage + '\n');
+    } catch (err) {
+        console.error('Error logging click data:', err);
+    }
 }
 
 // ASCII panel to display connected clients and their ping times
