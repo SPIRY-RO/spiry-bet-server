@@ -6,7 +6,8 @@ const fastifyCors = require('@fastify/cors');
 const fastifyFormbody = require('@fastify/formbody');
 
 const port = 8080;
-const RECEIVER_TOPIC = 'receivers'; // Single topic for all receivers
+const UP_RECEIVER_TOPIC = 'up_receivers'; // Topic for up_ receivers
+const DOWN_RECEIVER_TOPIC = 'down_receivers'; // Topic for down_ receivers
 
 // Mapping to store active sockets by username
 let activeSockets = {};
@@ -72,7 +73,6 @@ app.ws('/*', {
         const readableIp = ip.replace(/[^0-9.]/g, ''); // Convert to readable IPv4 format
         console.log("Socket is connected from IP:", readableIp);
         ws.ip = readableIp;
-        ws.subscribe(RECEIVER_TOPIC); // Subscribe all receivers to the single topic
         ws.pingInterval = setInterval(() => {
             ws.ping();
             for (let [username, sockets] of Object.entries(activeSockets)) {
@@ -101,18 +101,38 @@ app.ws('/*', {
                             activeSockets[username] = [];
                         }
                         activeSockets[username].push({ socket: ws, ip: ws.ip, ping: 0, missedPongs: 0 });
+
+                        // Subscribe to the appropriate topic based on the username prefix
+                        if (username.startsWith('up_')) {
+                            ws.subscribe(UP_RECEIVER_TOPIC);
+                        } else if (username.startsWith('down_')) {
+                            ws.subscribe(DOWN_RECEIVER_TOPIC);
+                        }
+
                         console.log(`${role} socket registered for user: ${username}`);
                     }
                 } else {
                     console.log("Username is required for registration.");
                 }
             } else if (parsedMessage.type === 'signal') {
-                const { action } = parsedMessage;
+                const { action, sender } = parsedMessage;
 
-                // Publish the signal to all receivers
-                app.publish(RECEIVER_TOPIC, action, false, false);
-                console.log(`Publishing message to all receivers: ${action}`);
-                logClickData('all_receivers', action);
+                // Determine the topic based on the sender's prefix
+                let topic;
+                if (sender.startsWith('up_')) {
+                    topic = UP_RECEIVER_TOPIC;
+                } else if (sender.startsWith('down_')) {
+                    topic = DOWN_RECEIVER_TOPIC;
+                }
+
+                // Publish the signal to the appropriate topic
+                if (topic) {
+                    app.publish(topic, action, false, false);
+                    console.log(`Publishing message to ${topic}: ${action}`);
+                    logClickData(sender, action);
+                } else {
+                    console.log("Invalid sender prefix.");
+                }
             }
         } catch (e) {
             console.log("Error parsing message:", e);

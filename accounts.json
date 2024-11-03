@@ -1,30 +1,30 @@
 [
     {
-        "username": "user1",
+        "username": "up_banu",
         "password": "123"
     },
     {
-        "username": "user2",
+        "username": "down_banu",
         "password": "123"
     },
     {
-        "username": "user3",
+        "username": "up_user1",
         "password": "123"
     },
     {
-        "username": "user4",
+        "username": "up_user2",
         "password": "123"
     },
     {
-        "username": "user5",
+        "username": "up_user3",
         "password": "123"
     },
     {
-        "username": "user6",
+        "username": "down_user1",
         "password": "123"
     },
     {
-        "username": "impulse1",
+        "username": "down_user2",
         "password": "123"
     }
 ]
