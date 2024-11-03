@@ -117,6 +117,11 @@ app.ws('/*', {
             } else if (parsedMessage.type === 'signal') {
                 const { action, sender } = parsedMessage;
 
+                if (!sender) {
+                    console.log("Sender is required for signal messages.");
+                    return;
+                }
+
                 // Determine the topic based on the sender's prefix
                 let topic;
                 if (sender.startsWith('up_')) {
