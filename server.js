@@ -115,12 +115,14 @@ app.ws('/*', {
                     console.log("Username is required for registration.");
                 }
             } else if (parsedMessage.type === 'signal') {
-                const { action, sender } = parsedMessage;
+                const { action, username: sender } = parsedMessage;
 
                 if (!sender) {
                     console.log("Sender is required for signal messages.");
                     return;
                 }
+
+                console.log(`Signal received from sender: ${sender}`);
 
                 // Determine the topic based on the sender's prefix
                 let topic;
