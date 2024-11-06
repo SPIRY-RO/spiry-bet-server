@@ -27,7 +27,7 @@ loadAccounts();
 
 // Fastify setup
 fastify.register(fastifyCors, {
-  origin: '*', // Adjust the origin as needed
+  origin: '*', // Allow any origin
   methods: ['GET', 'POST'] // Adjust the methods as needed
 });
 fastify.register(fastifyFormbody);
