@@ -69,10 +69,9 @@ const app = uWS.App();
 app.ws('/*', {
     open: (ws, req) => {
         const ipArrayBuffer = ws.getRemoteAddressAsText();
-        const ip = Buffer.from(ipArrayBuffer).toString();
-        const readableIp = ip.replace(/[^0-9.]/g, ''); // Convert to readable IPv4 format
-        console.log("Socket is connected from IP:", readableIp);
-        ws.ip = readableIp;
+        const ip = Buffer.from(ipArrayBuffer).toString('utf8').replace(/\0/g, '');
+        console.log("Socket is connected from IP:", ip);
+        ws.ip = ip;
         ws.pingInterval = setInterval(() => {
             ws.ping();
             for (let [username, sockets] of Object.entries(activeSockets)) {
