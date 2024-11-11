@@ -4,6 +4,8 @@ const fs = require('fs').promises; // Use promises for async file operations
 const readline = require('readline');
 const fastifyCors = require('@fastify/cors');
 const fastifyFormbody = require('@fastify/formbody');
+const ip = require('ip');
+const geoip = require('geoip-lite');
 
 const port = 8080;
 const UP_RECEIVER_TOPIC = 'up_receivers'; // Topic for up_ receivers
@@ -68,10 +70,19 @@ const app = uWS.App();
 
 app.ws('/*', {
     open: (ws, req) => {
-        const ipArrayBuffer = ws.getRemoteAddressAsText();
-        const ip = Buffer.from(ipArrayBuffer).toString('utf8').replace(/\0/g, '');
-        console.log("Socket is connected from IP:", ip);
-        ws.ip = ip;
+        let ipAddress = req.getHeader('x-forwarded-for');
+        if (!ipAddress) {
+            const ipArrayBuffer = ws.getRemoteAddressAsText();
+            ipAddress = ip.toString(Buffer.from(ipArrayBuffer).toString('utf8').replace(/\0/g, ''));
+        }
+        const geo = geoip.lookup(ipAddress);
+
+        console.log("Socket is connected from IP:", ipAddress);
+        if (geo) {
+            console.log(`Country: ${geo.country}, Region: ${geo.region}`);
+        }
+
+        ws.ip = ipAddress;
         ws.pingInterval = setInterval(() => {
             ws.ping();
             for (let [username, sockets] of Object.entries(activeSockets)) {
